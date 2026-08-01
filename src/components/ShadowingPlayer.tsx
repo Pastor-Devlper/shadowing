@@ -172,7 +172,9 @@ export default function ShadowingPlayer({ date, dialogues }: Props) {
     };
   }, []);
 
-  const line = dialogues[dIdx].lines[lIdx];
+  const current = dialogues[dIdx];
+  const isVerse = current.kind === "verse";
+  const line = current.lines[lIdx];
 
   return (
     <div className="app">
@@ -195,9 +197,28 @@ export default function ShadowingPlayer({ date, dialogues }: Props) {
       </div>
 
       <div className="stage">
-        <div className="speaker">{line.who}</div>
-        <div className="line-en">{line.en}</div>
-        <div className="line-kr">{line.kr}</div>
+        {isVerse ? (
+          <>
+            <div className="speaker">{current.reference ?? line.who}</div>
+            <div className="passage">
+              {current.lines.map((l, i) => (
+                <p
+                  key={i}
+                  className={"passage-line" + (i === lIdx ? " active" : "")}
+                >
+                  {l.en}
+                </p>
+              ))}
+            </div>
+            <div className="line-kr">{line.kr}</div>
+          </>
+        ) : (
+          <>
+            <div className="speaker">{line.who}</div>
+            <div className="line-en">{line.en}</div>
+            <div className="line-kr">{line.kr}</div>
+          </>
+        )}
 
         <div className="rhythm-wrap">
           <div className="rhythm">

@@ -7,10 +7,10 @@ import type { Dialogue, DialogueDoc, Line } from "./types";
 
 // Speaker A uses the configured voice; speaker B gets a contrasting one so the
 // two sides of a conversation sound like different people. The daily verse gets
-// its own calm voice.
+// its own calm voice — "echo" (US accent); avoid "fable", which is British.
 const VOICE_A = TTS_VOICE;
 const VOICE_B = process.env.OPENAI_TTS_VOICE_B || "nova";
-const VOICE_VERSE = process.env.OPENAI_TTS_VOICE_VERSE || "fable";
+const VOICE_VERSE = process.env.OPENAI_TTS_VOICE_VERSE || "echo";
 
 const SYSTEM_PROMPT = `You generate short English shadowing-practice dialogues for a Korean learner (intermediate, everyday conversational American English).
 
