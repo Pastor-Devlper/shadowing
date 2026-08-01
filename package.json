@@ -1,0 +1,29 @@
+{
+  "name": "shadowing",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "check:setup": "node --env-file=.env.local scripts/check-setup.mjs",
+    "generate": "node --env-file=.env.local --import tsx scripts/generate.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1101.0",
+    "@aws-sdk/s3-request-presigner": "^3.1101.0",
+    "mongodb": "^7.5.0",
+    "next": "^15.5.0",
+    "openai": "^7.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tsx": "^4.23.1",
+    "typescript": "^5"
+  }
+}
