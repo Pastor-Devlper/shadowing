@@ -3,23 +3,32 @@ import { mockDialogues } from "./mockData";
 import { getDb } from "./mongodb";
 
 /**
- * Single source of truth for "today's dialogues".
+ * Single source of truth for the dialogues to show "as of" a given date.
  *
- * Reads the day's document from MongoDB (lines already carry R2 `audioUrl`s
- * produced by the generation pipeline). Falls back to the mock set if the DB
- * is unreachable or no document exists yet for `date`, so the app never breaks.
+ * Content is generated only on some days (Mon/Wed/Fri), so this returns the
+ * most recent document with `date <= asOf` — i.e. the latest generated set
+ * stays on screen until the next generation day. `date` in the response is the
+ * content's actual generation date (which day's dialogues these are).
+ *
+ * Falls back to the mock set only if the DB is unreachable or nothing has been
+ * generated yet, so the app never breaks. Lines already carry R2 `audioUrl`s.
  */
-export async function getToday(date = todayIso()): Promise<TodayResponse> {
+export async function getToday(asOf = todayIso()): Promise<TodayResponse> {
   try {
     const db = await getDb();
-    const doc = await db.collection<DialogueDoc>("dialogues").findOne({ date });
+    const doc = await db
+      .collection<DialogueDoc>("dialogues")
+      .find({ date: { $lte: asOf } })
+      .sort({ date: -1 })
+      .limit(1)
+      .next();
     if (doc && doc.dialogues.length > 0) {
-      return { date, dialogues: doc.dialogues };
+      return { date: doc.date, dialogues: doc.dialogues };
     }
   } catch (err) {
     console.error("[getToday] DB read failed, using mock:", (err as Error).message);
   }
-  return { date, dialogues: mockDialogues };
+  return { date: asOf, dialogues: mockDialogues };
 }
 
 export function todayIso(): string {

@@ -38,9 +38,14 @@ npm run generate -- --force   # 이미 있어도 재생성 (재과금 주의)
 
 #### 자동 생성 (Vercel Cron)
 
-`vercel.json`에 매일 20:00 UTC(=05:00 KST) `/api/generate` 호출이 설정돼 있다.
+`vercel.json`의 크론은 **월·수·금 05:00 KST**에 `/api/generate`를 호출한다.
+Vercel 크론은 UTC 기준이라 `0 20 * * 0,2,4`(일·화·목 20:00 UTC)로 설정 —
+그 시각의 KST가 각각 월·수·금이라 그 날짜로 생성된다.
 Vercel 프로젝트 env에 모든 `.env.local` 값 + `CRON_SECRET`을 등록하면,
-크론이 `Authorization: Bearer $CRON_SECRET`로 인증되어 매일 콘텐츠를 만든다.
+크론이 `Authorization: Bearer $CRON_SECRET`로 인증된다.
+
+생성하지 않는 날에는 `getToday()`가 **가장 최근 생성분**(`date <= 오늘` 중 최신)을
+그대로 보여주므로, 다음 생성일까지 직전 대화가 유지된다.
 
 ## 구조
 
