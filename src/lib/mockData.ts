@@ -1,4 +1,5 @@
 import type { Dialogue } from "./types";
+import { verses } from "./verses";
 
 /**
  * Phase 1 mock content. In phase 2 these are generated daily by OpenAI,
@@ -35,5 +36,11 @@ export const mockDialogues: Dialogue[] = [
       { who: "B", en: "We should catch up properly sometime soon.", kr: "조만간 제대로 한번 만나서 얘기하자." },
       { who: "A", en: "Definitely, let's grab dinner next week.", kr: "완전 좋지, 다음 주에 저녁 먹자." },
     ],
+  },
+  {
+    kind: "verse",
+    title: "오늘의 말씀",
+    reference: verses[0].reference,
+    lines: verses[0].lines.map((l) => ({ who: verses[0].reference, en: l.en, kr: l.kr })),
   },
 ];

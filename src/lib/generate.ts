@@ -1,12 +1,16 @@
+import type { Db } from "mongodb";
 import { getOpenAI, TEXT_MODEL, TTS_MODEL, TTS_VOICE } from "./openai";
 import { uploadObject } from "./r2";
 import { getDb } from "./mongodb";
+import { verses, type Verse } from "./verses";
 import type { Dialogue, DialogueDoc, Line } from "./types";
 
 // Speaker A uses the configured voice; speaker B gets a contrasting one so the
-// two sides of a conversation sound like different people.
+// two sides of a conversation sound like different people. The daily verse gets
+// its own calm voice.
 const VOICE_A = TTS_VOICE;
 const VOICE_B = process.env.OPENAI_TTS_VOICE_B || "nova";
+const VOICE_VERSE = process.env.OPENAI_TTS_VOICE_VERSE || "fable";
 
 const SYSTEM_PROMPT = `You generate short English shadowing-practice dialogues for a Korean learner (intermediate, everyday conversational American English).
 
@@ -82,10 +86,10 @@ async function generateDialogueText(date: string): Promise<Dialogue[]> {
   return normalize(JSON.parse(content));
 }
 
-async function synthesize(text: string, who: string): Promise<Buffer> {
+async function synthesize(text: string, voice: string): Promise<Buffer> {
   const res = await getOpenAI().audio.speech.create({
     model: TTS_MODEL,
-    voice: (who === "A" ? VOICE_A : VOICE_B) as never,
+    voice: voice as never,
     input: text,
     response_format: "mp3",
   });
@@ -98,7 +102,9 @@ async function attachAudio(dialogues: Dialogue[], date: string): Promise<Dialogu
       ...d,
       lines: await Promise.all(
         d.lines.map(async (line, li): Promise<Line> => {
-          const audio = await synthesize(line.en, line.who);
+          const voice =
+            d.kind === "verse" ? VOICE_VERSE : line.who === "A" ? VOICE_A : VOICE_B;
+          const audio = await synthesize(line.en, voice);
           const key = `audio/${date}/${di}-${li}.mp3`;
           const audioUrl = await uploadObject(key, audio, "audio/mpeg");
           return { ...line, audioUrl };
@@ -106,6 +112,27 @@ async function attachAudio(dialogues: Dialogue[], date: string): Promise<Dialogu
       ),
     }))
   );
+}
+
+/** Sequential cursor over `verses`, advanced once per generation. */
+async function pickNextVerse(db: Db): Promise<Verse> {
+  const meta = db.collection<{ _id: string; next: number }>("meta");
+  const before = await meta.findOneAndUpdate(
+    { _id: "verseCursor" },
+    { $inc: { next: 1 } },
+    { upsert: true, returnDocument: "before" }
+  );
+  const index = before?.next ?? 0;
+  return verses[((index % verses.length) + verses.length) % verses.length];
+}
+
+function toVerseDialogue(v: Verse): Dialogue {
+  return {
+    kind: "verse",
+    title: "오늘의 말씀",
+    reference: v.reference,
+    lines: v.lines.map((l) => ({ who: v.reference, en: l.en, kr: l.kr })),
+  };
 }
 
 export interface GenerateResult {
@@ -133,7 +160,8 @@ export async function generateForDate(
   }
 
   const text = await generateDialogueText(date);
-  const withAudio = await attachAudio(text, date);
+  const verse = await pickNextVerse(db);
+  const withAudio = await attachAudio([...text, toVerseDialogue(verse)], date);
 
   await col.updateOne(
     { date },

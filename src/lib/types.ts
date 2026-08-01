@@ -13,6 +13,10 @@ export interface Line {
 export interface Dialogue {
   title: string;
   lines: Line[];
+  /** "verse" renders as the daily Bible passage (4th tab) instead of an A/B dialogue. */
+  kind?: "dialogue" | "verse";
+  /** Scripture reference for verse items, e.g. "John 3:16". */
+  reference?: string;
 }
 
 export interface TodayResponse {
