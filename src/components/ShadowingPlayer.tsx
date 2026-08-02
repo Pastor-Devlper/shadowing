@@ -179,7 +179,7 @@ export default function ShadowingPlayer({ date, dialogues }: Props) {
   return (
     <div className="app">
       <div className="topbar">
-        <span className="brand">Triweekly 회화 & 성경 암송</span>
+        <span className="brand">Triweekly 영어회화 & 성경구절</span>
         <span className="date">{dateLabel}</span>
       </div>
 
