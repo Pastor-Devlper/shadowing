@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "말하기 박자 — 오늘의 섀도잉",
-  description: "매일 대화 3개로 하는 영어 섀도잉 연습",
+  title: "Triweekly 회화 & 성경 암송",
+  description: "월·수·금 영어 회화 + 성경 구절 섀도잉 연습",
 };
 
 export const viewport: Viewport = {
