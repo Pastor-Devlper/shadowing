@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Triweekly 회화 & 성경 암송",
+  title: "회화 & 성경구절",
   description: "월·수·금 영어 회화 + 성경 구절 섀도잉 연습",
 };
 
