@@ -9,6 +9,7 @@
     "lint": "next lint",
     "check:setup": "node --env-file=.env.local scripts/check-setup.mjs",
     "generate": "node --env-file=.env.local --import tsx scripts/generate.ts",
+    "inspect": "node --env-file=.env.local --import tsx scripts/inspect.ts",
     "revoice:verse": "node --env-file=.env.local --import tsx scripts/revoice-verse.ts"
   },
   "dependencies": {
