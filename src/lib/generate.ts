@@ -114,16 +114,28 @@ async function attachAudio(dialogues: Dialogue[], date: string): Promise<Dialogu
   );
 }
 
-/** Sequential cursor over `verses`, advanced once per generation. */
-async function pickNextVerse(db: Db): Promise<Verse> {
-  const meta = db.collection<{ _id: string; next: number }>("meta");
-  const before = await meta.findOneAndUpdate(
+function verseCursor(db: Db) {
+  return db.collection<{ _id: string; next: number }>("meta");
+}
+
+/**
+ * Sequential cursor over `verses`. Reading and advancing are split on purpose:
+ * TTS/R2/timeouts can fail after the verse is chosen, and an advance that
+ * happened anyway would silently skip that verse forever. See `advanceVerse`.
+ */
+async function peekVerse(db: Db): Promise<Verse> {
+  const cursor = await verseCursor(db).findOne({ _id: "verseCursor" });
+  const index = cursor?.next ?? 0;
+  return verses[((index % verses.length) + verses.length) % verses.length];
+}
+
+/** Move past the verse we just published. Only call once the day is saved. */
+async function advanceVerse(db: Db): Promise<void> {
+  await verseCursor(db).updateOne(
     { _id: "verseCursor" },
     { $inc: { next: 1 } },
-    { upsert: true, returnDocument: "before" }
+    { upsert: true }
   );
-  const index = before?.next ?? 0;
-  return verses[((index % verses.length) + verses.length) % verses.length];
 }
 
 function toVerseDialogue(v: Verse): Dialogue {
@@ -160,7 +172,7 @@ export async function generateForDate(
   }
 
   const text = await generateDialogueText(date);
-  const verse = await pickNextVerse(db);
+  const verse = await peekVerse(db);
   const withAudio = await attachAudio([...text, toVerseDialogue(verse)], date);
 
   await col.updateOne(
@@ -168,6 +180,9 @@ export async function generateForDate(
     { $set: { date, dialogues: withAudio, generatedAt: new Date() } },
     { upsert: true }
   );
+
+  // The day's content is safely stored, so this verse is genuinely spent.
+  await advanceVerse(db);
 
   const lines = withAudio.reduce((n, d) => n + d.lines.length, 0);
   return { date, created: true, dialogues: withAudio.length, lines };
