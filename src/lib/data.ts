@@ -1,4 +1,4 @@
-import type { DialogueDoc, TodayResponse } from "./types";
+import type { DialogueDoc, HistoryEntry, TodayResponse } from "./types";
 import { mockDialogues } from "./mockData";
 import { getDb } from "./mongodb";
 
@@ -29,6 +29,40 @@ export async function getToday(asOf = todayIso()): Promise<TodayResponse> {
     console.error("[getToday] DB read failed, using mock:", (err as Error).message);
   }
   return { date: asOf, dialogues: mockDialogues };
+}
+
+/** Exact-date lookup for the "지난 대화" strip — unlike getToday this never falls back to a nearby day. */
+export async function getByDate(date: string): Promise<TodayResponse | null> {
+  try {
+    const db = await getDb();
+    const doc = await db.collection<DialogueDoc>("dialogues").findOne({ date });
+    if (doc && doc.dialogues.length > 0) {
+      return { date: doc.date, dialogues: doc.dialogues };
+    }
+  } catch (err) {
+    console.error("[getByDate] DB read failed:", (err as Error).message);
+  }
+  return null;
+}
+
+/** Recent past days (title only) for the "지난 대화" strip, newest first. */
+export async function getHistory(limit = 30): Promise<HistoryEntry[]> {
+  try {
+    const db = await getDb();
+    const docs = await db
+      .collection<DialogueDoc>("dialogues")
+      .find({ date: { $lte: todayIso() } }, { projection: { date: 1, dialogues: 1 } })
+      .sort({ date: -1 })
+      .limit(limit)
+      .toArray();
+    return docs.map((doc) => ({
+      date: doc.date,
+      title: doc.dialogues.find((d) => d.kind !== "verse")?.title ?? "",
+    }));
+  } catch (err) {
+    console.error("[getHistory] DB read failed:", (err as Error).message);
+    return [];
+  }
 }
 
 export function todayIso(): string {

@@ -1,19 +1,32 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Dialogue } from "@/lib/types";
+import type { Dialogue, HistoryEntry, TodayResponse } from "@/lib/types";
 import { createSpeaker } from "@/lib/audio";
 
 const REPEATS = 3;
 const RADIUS = 26;
 const CIRC = 2 * Math.PI * RADIUS;
+const SCROLL_DOTS = 5;
+
+function chipDate(iso: string) {
+  const d = new Date(iso + "T00:00:00");
+  return { day: d.getDate(), weekday: d.toLocaleDateString("ko-KR", { weekday: "short" }) };
+}
 
 interface Props {
   date: string;
   dialogues: Dialogue[];
 }
 
-export default function ShadowingPlayer({ date, dialogues }: Props) {
+export default function ShadowingPlayer({ date: initialDate, dialogues: initialDialogues }: Props) {
+  // Which day is on screen — changes when a "지난 대화" chip is picked.
+  const [date, setDate] = useState(initialDate);
+  const [dialogues, setDialogues] = useState(initialDialogues);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const chipRowRef = useRef<HTMLDivElement>(null);
+  const [chipScroll, setChipScroll] = useState(0);
+
   // Render state (drives the DOM).
   const [dIdx, setDIdxState] = useState(0);
   const [lIdx, setLIdxState] = useState(0);
@@ -172,6 +185,40 @@ export default function ShadowingPlayer({ date, dialogues }: Props) {
     };
   }, []);
 
+  // "지난 대화" strip — fetched once; the list itself doesn't change while the page is open.
+  useEffect(() => {
+    fetch("/api/history")
+      .then((res) => (res.ok ? res.json() : { items: [] }))
+      .then((data: { items?: HistoryEntry[] }) => setHistory(data.items ?? []))
+      .catch(() => setHistory([]));
+  }, []);
+
+  const loadDay = async (target: string) => {
+    if (target === date) return;
+    stopAll();
+    try {
+      const res = await fetch(`/api/day?date=${target}`);
+      if (!res.ok) return;
+      const data: TodayResponse = await res.json();
+      setDialogues(data.dialogues);
+      setDate(data.date);
+      setDIdx(0);
+      setLIdx(0);
+      setRep(0);
+      setStatus("준비됨");
+      setRing(0);
+    } catch {
+      // Network hiccup — stay on the current day rather than showing an error.
+    }
+  };
+
+  const onChipScroll = () => {
+    const el = chipRowRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    setChipScroll(max <= 0 ? 0 : el.scrollLeft / max);
+  };
+
   const current = dialogues[dIdx];
   const isVerse = current.kind === "verse";
   const line = current.lines[lIdx];
@@ -279,6 +326,42 @@ export default function ShadowingPlayer({ date, dialogues }: Props) {
           </svg>
         </button>
       </div>
+
+      {history.length > 0 && (
+        <div className="history">
+          <div className="history-eyebrow">지난 대화</div>
+          <div className="chip-row-mask">
+            <div className="chip-row" ref={chipRowRef} onScroll={onChipScroll}>
+              {history.map((h) => {
+                const { day, weekday } = chipDate(h.date);
+                return (
+                  <button
+                    key={h.date}
+                    className={"chip" + (h.date === date ? " today" : "")}
+                    onClick={() => loadDay(h.date)}
+                  >
+                    <div className="cd">
+                      <span>{day}</span>
+                      <span>{weekday}</span>
+                    </div>
+                    <div className="ct">{h.title}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {history.length > SCROLL_DOTS && (
+            <div className="scroll-dots">
+              {Array.from({ length: SCROLL_DOTS }).map((_, i) => (
+                <div
+                  key={i}
+                  className={"scroll-dot" + (i === Math.round(chipScroll * (SCROLL_DOTS - 1)) ? " active" : "")}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

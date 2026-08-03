@@ -25,6 +25,12 @@ export interface TodayResponse {
   dialogues: Dialogue[];
 }
 
+/** One entry in the "지난 대화" strip — a past day's date and lead title. */
+export interface HistoryEntry {
+  date: string;
+  title: string;
+}
+
 /** One MongoDB document per day, in the `dialogues` collection. */
 export interface DialogueDoc {
   date: string; // YYYY-MM-DD, unique
