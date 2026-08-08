@@ -1,17 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Dialogue, HistoryEntry, TodayResponse } from "@/lib/types";
+import type { Dialogue, DialogueRef, HistoryData, TodayResponse } from "@/lib/types";
 import { createSpeaker } from "@/lib/audio";
 
 const REPEATS = 3;
 const RADIUS = 26;
 const CIRC = 2 * Math.PI * RADIUS;
 const SCROLL_DOTS = 5;
+const RECENT_CHIPS = 15;
 
-function chipDate(iso: string) {
+function dayLabel(iso: string) {
   const d = new Date(iso + "T00:00:00");
-  return { day: d.getDate(), weekday: d.toLocaleDateString("ko-KR", { weekday: "short" }) };
+  return d.toLocaleDateString("ko-KR", { month: "numeric", day: "numeric", weekday: "short" });
 }
 
 interface Props {
@@ -23,7 +24,8 @@ export default function ShadowingPlayer({ date: initialDate, dialogues: initialD
   // Which day is on screen — changes when a "지난 대화" chip is picked.
   const [date, setDate] = useState(initialDate);
   const [dialogues, setDialogues] = useState(initialDialogues);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [hist, setHist] = useState<HistoryData>({ total: 0, dialogues: [], verses: [] });
+  const [showArchive, setShowArchive] = useState(false);
   const chipRowRef = useRef<HTMLDivElement>(null);
   const [chipScroll, setChipScroll] = useState(0);
 
@@ -185,16 +187,23 @@ export default function ShadowingPlayer({ date: initialDate, dialogues: initialD
     };
   }, []);
 
-  // "지난 대화" strip — fetched once; the list itself doesn't change while the page is open.
+  // "지난 대화" data — fetched once; it doesn't change while the page is open.
   useEffect(() => {
     fetch("/api/history")
-      .then((res) => (res.ok ? res.json() : { items: [] }))
-      .then((data: { items?: HistoryEntry[] }) => setHistory(data.items ?? []))
-      .catch(() => setHistory([]));
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: HistoryData | null) => {
+        if (data) setHist(data);
+      })
+      .catch(() => {});
   }, []);
 
-  const loadDay = async (target: string) => {
-    if (target === date) return;
+  // Load a specific past dialogue (or verse) by day + tab index, then select it.
+  const loadDialogue = async (target: string, index: number) => {
+    setShowArchive(false);
+    if (target === date) {
+      selectDialogue(index);
+      return;
+    }
     stopAll();
     try {
       const res = await fetch(`/api/day?date=${target}`);
@@ -202,7 +211,7 @@ export default function ShadowingPlayer({ date: initialDate, dialogues: initialD
       const data: TodayResponse = await res.json();
       setDialogues(data.dialogues);
       setDate(data.date);
-      setDIdx(0);
+      setDIdx(index < data.dialogues.length ? index : 0);
       setLIdx(0);
       setRep(0);
       setStatus("준비됨");
@@ -211,6 +220,21 @@ export default function ShadowingPlayer({ date: initialDate, dialogues: initialD
       // Network hiccup — stay on the current day rather than showing an error.
     }
   };
+
+  // Group past dialogues by day (newest day first, oldest # first within a day)
+  // for the archive screen.
+  const archiveGroups = useMemo(() => {
+    const map = new Map<string, DialogueRef[]>();
+    for (const d of hist.dialogues) {
+      const list = map.get(d.date) ?? [];
+      list.push(d);
+      map.set(d.date, list);
+    }
+    return [...map.entries()].map(([date, items]) => ({
+      date,
+      items: [...items].sort((a, b) => a.index - b.index),
+    }));
+  }, [hist.dialogues]);
 
   const onChipScroll = () => {
     const el = chipRowRef.current;
@@ -327,30 +351,31 @@ export default function ShadowingPlayer({ date: initialDate, dialogues: initialD
         </button>
       </div>
 
-      {history.length > 0 && (
+      {hist.dialogues.length > 0 && (
         <div className="history">
-          <div className="history-eyebrow">지난 대화</div>
+          <div className="history-head">
+            <span className="history-eyebrow">지난 대화</span>
+            <span className="counter">지금까지 <b>{hist.total}</b>개</span>
+            <button className="archive-link" onClick={() => setShowArchive(true)}>
+              전체 보기 ›
+            </button>
+          </div>
+
           <div className="chip-row-mask">
             <div className="chip-row" ref={chipRowRef} onScroll={onChipScroll}>
-              {history.map((h) => {
-                const { day, weekday } = chipDate(h.date);
-                return (
-                  <button
-                    key={h.date}
-                    className={"chip" + (h.date === date ? " today" : "")}
-                    onClick={() => loadDay(h.date)}
-                  >
-                    <div className="cd">
-                      <span>{day}</span>
-                      <span>{weekday}</span>
-                    </div>
-                    <div className="ct">{h.title}</div>
-                  </button>
-                );
-              })}
+              {hist.dialogues.slice(0, RECENT_CHIPS).map((d) => (
+                <button
+                  key={`${d.date}-${d.index}`}
+                  className={"chip" + (d.date === date && d.index === dIdx ? " active" : "")}
+                  onClick={() => loadDialogue(d.date, d.index)}
+                >
+                  <span className="cn">#{d.n}</span>
+                  <span className="ct">{d.title}</span>
+                </button>
+              ))}
             </div>
           </div>
-          {history.length > SCROLL_DOTS && (
+          {hist.dialogues.length > SCROLL_DOTS && (
             <div className="scroll-dots">
               {Array.from({ length: SCROLL_DOTS }).map((_, i) => (
                 <div
@@ -360,6 +385,55 @@ export default function ShadowingPlayer({ date: initialDate, dialogues: initialD
               ))}
             </div>
           )}
+
+          {hist.verses.length > 0 && (
+            <>
+              <div className="verse-eyebrow">말씀</div>
+              <div className="chip-row-mask">
+                <div className="verse-row">
+                  {hist.verses.slice(0, 12).map((v) => (
+                    <button
+                      key={`${v.date}-${v.index}`}
+                      className={"verse-chip" + (v.date === date && v.index === dIdx ? " active" : "")}
+                      onClick={() => loadDialogue(v.date, v.index)}
+                    >
+                      {v.reference}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {showArchive && (
+        <div className="archive" role="dialog" aria-label="전체 기록">
+          <div className="archive-head">
+            <button className="archive-back" onClick={() => setShowArchive(false)} aria-label="뒤로">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <span className="archive-title">전체 기록 · {hist.total}개</span>
+          </div>
+          <div className="archive-body">
+            {archiveGroups.map((g) => (
+              <div className="archive-group" key={g.date}>
+                <div className="archive-date">{dayLabel(g.date)}</div>
+                {g.items.map((d) => (
+                  <button
+                    key={`${d.date}-${d.index}`}
+                    className={"archive-item" + (d.date === date && d.index === dIdx ? " active" : "")}
+                    onClick={() => loadDialogue(d.date, d.index)}
+                  >
+                    <span className="ai-n">#{d.n}</span>
+                    <span className="ai-t">{d.title}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
