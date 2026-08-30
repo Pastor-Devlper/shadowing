@@ -1,4 +1,4 @@
-import type { DialogueDoc, HistoryEntry, TodayResponse } from "./types";
+import type { DialogueDoc, HistoryData, TodayResponse } from "./types";
 import { mockDialogues } from "./mockData";
 import { getDb } from "./mongodb";
 
@@ -45,23 +45,39 @@ export async function getByDate(date: string): Promise<TodayResponse | null> {
   return null;
 }
 
-/** Recent past days (title only) for the "지난 대화" strip, newest first. */
-export async function getHistory(limit = 30): Promise<HistoryEntry[]> {
+/**
+ * Every past dialogue with a cumulative number, plus verses as a separate
+ * track. Numbers are computed here (oldest = 1) rather than stored, so no
+ * backfill is needed and they stay stable as new days are only ever appended.
+ */
+export async function getDialogueHistory(): Promise<HistoryData> {
   try {
     const db = await getDb();
     const docs = await db
       .collection<DialogueDoc>("dialogues")
       .find({ date: { $lte: todayIso() } }, { projection: { date: 1, dialogues: 1 } })
-      .sort({ date: -1 })
-      .limit(limit)
+      .sort({ date: 1 }) // oldest first so the running count is chronological
       .toArray();
-    return docs.map((doc) => ({
-      date: doc.date,
-      title: doc.dialogues.find((d) => d.kind !== "verse")?.title ?? "",
-    }));
+
+    const dialogues: HistoryData["dialogues"] = [];
+    const verses: HistoryData["verses"] = [];
+    let n = 0;
+    for (const doc of docs) {
+      doc.dialogues.forEach((d, index) => {
+        if (d.kind === "verse") {
+          verses.push({ reference: d.reference ?? d.title, date: doc.date, index });
+        } else {
+          n += 1;
+          dialogues.push({ n, title: d.title, date: doc.date, index });
+        }
+      });
+    }
+    dialogues.reverse(); // newest first for display
+    verses.reverse();
+    return { total: n, dialogues, verses };
   } catch (err) {
-    console.error("[getHistory] DB read failed:", (err as Error).message);
-    return [];
+    console.error("[getDialogueHistory] DB read failed:", (err as Error).message);
+    return { total: 0, dialogues: [], verses: [] };
   }
 }
 
