@@ -29,7 +29,7 @@ Return ONLY a JSON object of this exact shape:
 
 Rules:
 - Exactly 3 dialogues.
-- Each dialogue has exactly 5 lines.
+- Each dialogue has 5 or 6 lines — use 6 only when the conversation naturally needs one more exchange to feel complete, not by default.
 - Speakers strictly alternate, starting with "A".
 - Everyday, high-frequency situations, distinct from each other.
 - Make each situation SPECIFIC, not a generic category: "안 맞는 재킷 환불하기" beats "쇼핑하기", "치과 예약 미루기" beats "전화 통화". Generic scenarios are what makes every day look the same.
