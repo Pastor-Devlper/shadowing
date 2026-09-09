@@ -197,6 +197,15 @@ export default function ShadowingPlayer({ date: initialDate, dialogues: initialD
       .catch(() => {});
   }, []);
 
+  // Chips read oldest → newest, left to right, so scroll to the newest
+  // (right edge) once they've rendered instead of opening on the oldest.
+  useEffect(() => {
+    const el = chipRowRef.current;
+    if (!el || hist.dialogues.length === 0) return;
+    el.scrollLeft = el.scrollWidth;
+    onChipScroll();
+  }, [hist.dialogues.length]);
+
   // Load a specific past dialogue (or verse) by day + tab index, then select it.
   const loadDialogue = async (target: string, index: number) => {
     setShowArchive(false);
@@ -363,7 +372,7 @@ export default function ShadowingPlayer({ date: initialDate, dialogues: initialD
 
           <div className="chip-row-mask">
             <div className="chip-row" ref={chipRowRef} onScroll={onChipScroll}>
-              {hist.dialogues.slice(0, RECENT_CHIPS).map((d) => (
+              {hist.dialogues.slice(0, RECENT_CHIPS).reverse().map((d) => (
                 <button
                   key={`${d.date}-${d.index}`}
                   className={"chip" + (d.date === date && d.index === dIdx ? " active" : "")}
