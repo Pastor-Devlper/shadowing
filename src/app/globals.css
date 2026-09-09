@@ -415,7 +415,7 @@ body {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--paper-dim);
-  padding: 10px 20px 8px;
+  padding: 5px 20px 8px;
 }
 .verse-row {
   display: flex;
@@ -526,7 +526,7 @@ body {
   display: flex;
   justify-content: center;
   gap: 6px;
-  padding: 4px 0 18px;
+  padding: 4px 0 4px;
 }
 .scroll-dot {
   width: 5px;
