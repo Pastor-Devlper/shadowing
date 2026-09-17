@@ -34,6 +34,7 @@ Rules:
 - Everyday, high-frequency situations, distinct from each other.
 - Make each situation SPECIFIC, not a generic category: "안 맞는 재킷 환불하기" beats "쇼핑하기", "치과 예약 미루기" beats "전화 통화". Generic scenarios are what makes every day look the same.
 - Pull from a wide range across days: work, phone calls, travel, health, neighbors, hobbies, school, banking, repairs, restaurants, transport, apartment life, customer service, catching up with friends, deliveries, weather, pets, moving, appointments.
+- Rotate the conversational purpose too, not just the setting. Don't default to "A asks B to book/check/confirm/schedule something" every time — also use complaining, giving advice, disagreeing or negotiating, sharing surprising news, apologizing, congratulating, casual catching-up, giving directions/instructions, expressing worry, venting, small talk. Across the 3 dialogues, no two should share the same purpose.
 - English: natural, spoken, contractions welcome, 1 sentence per line, not textbook-stiff.
 - "kr": natural Korean that a native would actually say, not a literal gloss.
 - "title": a short Korean phrase.
@@ -72,12 +73,13 @@ function normalize(raw: unknown): Dialogue[] {
 }
 
 /**
- * Titles from recent generations. The model has no memory between runs, so
- * without this it keeps landing on the same textbook situations (카페 주문,
- * 길 묻기, 쇼핑) every single time. Feeding the recent ones back as an
- * exclusion list is what actually makes consecutive days look different.
+ * Titles from recent generations (~30 days by default). The model has no
+ * memory between runs, so without this it keeps landing on the same
+ * textbook situations (카페 주문, 길 묻기, 쇼핑) every single time. Feeding the
+ * recent ones back as an exclusion list is what actually makes consecutive
+ * days look different.
  */
-async function recentSituations(db: Db, limit = 12): Promise<string[]> {
+async function recentSituations(db: Db, limit = 30): Promise<string[]> {
   const docs = await db
     .collection<DialogueDoc>("dialogues")
     .find({}, { projection: { dialogues: 1 } })
